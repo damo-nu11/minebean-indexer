@@ -1,0 +1,52 @@
+name: commit-window
+
+on:
+  workflow_dispatch:
+  # No schedule. External cron (cron-job.org) hits workflow_dispatch.
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout indexer repo
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Install Gitlawb CLI
+        run: |
+          curl -fsSL https://gitlawb.com/install.sh | sh
+          # Add gitlawb's install dir to PATH (covers both /usr/local/bin and ~/.local/bin)
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Gitlawb identity files
+        env:
+          GITLAWB_IDENTITY_PEM_B64: ${{ secrets.GITLAWB_IDENTITY_PEM_B64 }}
+          GITLAWB_UCAN_JSON_B64: ${{ secrets.GITLAWB_UCAN_JSON_B64 }}
+        run: |
+          mkdir -p "$HOME/.gitlawb"
+          printf '%s' "$GITLAWB_IDENTITY_PEM_B64" | base64 -d > "$HOME/.gitlawb/identity.pem"
+          printf '%s' "$GITLAWB_UCAN_JSON_B64" | base64 -d > "$HOME/.gitlawb/ucan.json"
+          chmod 600 "$HOME/.gitlawb/identity.pem"
+
+      - name: Verify Gitlawb identity
+        run: |
+          which gl || { echo "ERROR: gl binary not on PATH after install"; exit 1; }
+          gl --version
+          gl identity show
+
+      - name: Run indexer
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          GITLAWB_PSEUDONYM_SALT: ${{ secrets.GITLAWB_PSEUDONYM_SALT }}
+          GITLAWB_REPO_URL: ${{ secrets.GITLAWB_REPO_URL }}
+          GITLAWB_DID: ${{ secrets.GITLAWB_DID }}
+          GITLAWB_NODE: https://node.gitlawb.com
+        run: |
+          chmod +x scripts/*.sh
+          bash scripts/run.sh

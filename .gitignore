@@ -1,0 +1,18 @@
+# Secrets
+.env
+.env.local
+*.pem
+ucan.json
+
+# Working directories
+minebean-rounds/
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
