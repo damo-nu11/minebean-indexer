@@ -19,7 +19,7 @@ jobs:
 
       - name: Install Gitlawb CLI
         run: |
-          curl -fsSL https://gitlawb.com/install.sh | sh
+          curl -fsSL https://gitlawb.com/install.sh | bash
           # Add gitlawb's install dir to PATH (covers both /usr/local/bin and ~/.local/bin)
           echo "/usr/local/bin" >> "$GITHUB_PATH"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
