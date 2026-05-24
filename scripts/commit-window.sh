@@ -67,9 +67,27 @@ git config user.email "${GITLAWB_DID}@gitlawb"
 mkdir -p "$(dirname "$TARGET_PATH")"
 cp "$WINDOW_JSON_PATH" "$TARGET_PATH"
 
-# Commit and push
+# Commit and push with retry on non-fast-forward (handles gitlawb gateway lag
+# and overlapping cron runs that would otherwise race on main).
 git add "$TARGET_PATH"
 git commit -m "window ${WINDOW_START}: 5 rounds"
-git push origin main
 
-echo "Pushed $TARGET_PATH"
+PUSH_MAX_ATTEMPTS=3
+for attempt in $(seq 1 "$PUSH_MAX_ATTEMPTS"); do
+    if git push origin main; then
+        echo "Pushed $TARGET_PATH (attempt $attempt)"
+        exit 0
+    fi
+    if [ "$attempt" -ge "$PUSH_MAX_ATTEMPTS" ]; then
+        echo "ERROR: push failed after $PUSH_MAX_ATTEMPTS attempts" >&2
+        exit 1
+    fi
+    echo "Push attempt $attempt failed, fetching and rebasing..."
+    git fetch origin main
+    if ! git rebase origin/main; then
+        echo "ERROR: rebase conflict against origin/main, aborting" >&2
+        git rebase --abort || true
+        exit 1
+    fi
+    sleep $((attempt * 2))
+done

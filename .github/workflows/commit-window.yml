@@ -4,6 +4,12 @@ on:
   workflow_dispatch:
   # No schedule. External cron (cron-job.org) hits workflow_dispatch.
 
+# Serialize runs to prevent concurrent push races against gitlawb main.
+# Queue overlapping dispatches rather than dropping or racing them.
+concurrency:
+  group: commit-window
+  cancel-in-progress: false
+
 jobs:
   commit:
     runs-on: ubuntu-latest
