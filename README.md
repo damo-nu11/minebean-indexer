@@ -1,6 +1,11 @@
 # minebean-indexer
 
-Bash indexer that reads closed rounds from the MineBean `GridMining` contract on Base and publishes a 5-minute audit window to the [`minebean-rounds`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-rounds) repo on Gitlawb.
+Bash indexer that reads closed rounds from the MineBean `GridMining` contract on Base and publishes signed audit logs to MineBean's Gitlawb repos. Two flows ship today:
+
+- **commit-window** → [`minebean-rounds`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-rounds): one window file every 5 minutes covering the last 5 settled rounds.
+- **commit-nostradamus** → [`minebean-nostradamus`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-nostradamus): one decision file per settled round, replaying the canonical closed-form EV math from `hermes-mine-bean/strategies.py` (`_nostradamus`).
+
+Both flows are independent: separate workflows, separate concurrency groups, separate Gitlawb repos.
 
 ## How it works
 
@@ -35,19 +40,22 @@ Set under repo Settings → Secrets and variables → Actions:
 | `GITLAWB_UCAN_JSON_B64` | Base64-encoded contents of `~/.gitlawb/ucan.json` |
 | `GITLAWB_PSEUDONYM_SALT` | Random 32-byte hex string. Generated once, never rotated. |
 | `GITLAWB_DID` | The DID that owns the `minebean-rounds` repo (e.g. `did:key:z6Mk…`). |
-| `GITLAWB_REPO_URL` | Gitlawb push URL for the rounds repo (e.g. `gitlawb://…/minebean-rounds`). |
+| `GITLAWB_REPO_URL` | Gitlawb push URL for the rounds repo (e.g. `gitlawb://…/minebean-rounds`). Used by `commit-window`. |
+| `GITLAWB_NOSTRADAMUS_REPO` | Gitlawb push URL for the nostradamus repo (e.g. `gitlawb://…/minebean-nostradamus`). Used by `commit-nostradamus`. |
 | `BASE_RPC_URL` | Base mainnet RPC endpoint. Public works (`https://mainnet.base.org`). |
 
 ## Manual trigger
 
 ```bash
-gh workflow run commit-window.yml --repo damo-nu11/minebean-indexer
+gh workflow run commit-window.yml       --repo damo-nu11/minebean-indexer
+gh workflow run commit-nostradamus.yml  --repo damo-nu11/minebean-indexer
 ```
 
-Or via cron-job.org POSTing to:
+Or via cron-job.org POSTing to (one entry per workflow):
 
 ```
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-window.yml/dispatches
+https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-nostradamus.yml/dispatches
 ```
 
 ## Local testing
@@ -64,11 +72,15 @@ export BASE_RPC_URL=https://mainnet.base.org
 export GITLAWB_PSEUDONYM_SALT="$(openssl rand -hex 32)"
 export DRY_RUN=true
 
-# Run once
+# Run window indexer once
 bash scripts/run.sh
+
+# Run nostradamus indexer once (no push)
+OUTPUT_PATH=/tmp/nostradamus-decision.json bash scripts/fetch-nostradamus.sh
+jq '.decision' /tmp/nostradamus-decision.json
 ```
 
-`DRY_RUN=true` skips the git push step. The window JSON is written to `/tmp/minebean-indexer-window.json` for inspection.
+`DRY_RUN=true` skips the git push step. The window JSON is written to `/tmp/minebean-indexer-window.json` for inspection. The nostradamus decision is written to `/tmp/nostradamus-decision.json`.
 
 ## Contracts (Base, chain 8453)
 
@@ -76,6 +88,7 @@ bash scripts/run.sh
 |---|---|
 | GridMining | `0x9632495bDb93FD6B0740Ab69cc6c71C9c01da4f0` |
 | Bean (ERC20) | `0x5c72992b83E74c4D5200A8E8920fB946214a5A5D` |
+| Nostradamus vault | `0x1098f65b0529E7E78cE8749621e3F0427b2a37f6` |
 
 ## License
 
