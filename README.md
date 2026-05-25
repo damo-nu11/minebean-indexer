@@ -1,11 +1,12 @@
 # minebean-indexer
 
-Bash indexer that reads closed rounds from the MineBean `GridMining` contract on Base and publishes signed audit logs to MineBean's Gitlawb repos. Two flows ship today:
+Bash indexer that reads on-chain state and events from the MineBean `GridMining` contract on Base and publishes signed audit logs to MineBean's Gitlawb repos. Three flows ship today:
 
 - **commit-window** → [`minebean-rounds`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-rounds): one window file every 5 minutes covering the last 5 settled rounds.
 - **commit-nostradamus** → [`minebean-nostradamus`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-nostradamus): one decision file per settled round, replaying the canonical closed-form EV math from `hermes-mine-bean/strategies.py` (`_nostradamus`).
+- **commit-claims** → [`minebean-claims`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-claims): one claim file per `ClaimedBEAN` event emitted by GridMining, with pseudonymized claimer and the full mined/roasted/fee/net breakdown.
 
-Both flows are independent: separate workflows, separate concurrency groups, separate Gitlawb repos.
+All three flows are independent: separate workflows, separate concurrency groups, separate Gitlawb repos.
 
 ## How it works
 
@@ -38,10 +39,11 @@ Set under repo Settings → Secrets and variables → Actions:
 |---|---|
 | `GITLAWB_IDENTITY_PEM_B64` | Base64-encoded contents of `~/.gitlawb/identity.pem` |
 | `GITLAWB_UCAN_JSON_B64` | Base64-encoded contents of `~/.gitlawb/ucan.json` |
-| `GITLAWB_PSEUDONYM_SALT` | Random 32-byte hex string. Generated once, never rotated. |
-| `GITLAWB_DID` | The DID that owns the `minebean-rounds` repo (e.g. `did:key:z6Mk…`). |
+| `GITLAWB_PSEUDONYM_SALT` | Random 32-byte hex string. Generated once, never rotated. Used by `commit-window` and `commit-claims`. |
+| `GITLAWB_DID` | The DID that owns the MineBean Gitlawb repos (e.g. `did:key:z6Mk…`). |
 | `GITLAWB_REPO_URL` | Gitlawb push URL for the rounds repo (e.g. `gitlawb://…/minebean-rounds`). Used by `commit-window`. |
 | `GITLAWB_NOSTRADAMUS_REPO` | Gitlawb push URL for the nostradamus repo (e.g. `gitlawb://…/minebean-nostradamus`). Used by `commit-nostradamus`. |
+| `GITLAWB_CLAIMS_REPO` | Gitlawb push URL for the claims repo (e.g. `gitlawb://…/minebean-claims`). Used by `commit-claims`. |
 | `BASE_RPC_URL` | Base mainnet RPC endpoint. Public works (`https://mainnet.base.org`). |
 
 ## Manual trigger
@@ -49,6 +51,7 @@ Set under repo Settings → Secrets and variables → Actions:
 ```bash
 gh workflow run commit-window.yml       --repo damo-nu11/minebean-indexer
 gh workflow run commit-nostradamus.yml  --repo damo-nu11/minebean-indexer
+gh workflow run commit-claims.yml       --repo damo-nu11/minebean-indexer
 ```
 
 Or via cron-job.org POSTing to (one entry per workflow):
@@ -56,6 +59,7 @@ Or via cron-job.org POSTing to (one entry per workflow):
 ```
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-window.yml/dispatches
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-nostradamus.yml/dispatches
+https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-claims.yml/dispatches
 ```
 
 ## Local testing
