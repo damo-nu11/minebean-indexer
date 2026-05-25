@@ -20,7 +20,7 @@
 #   )
 #
 # Decoding plan:
-#   topics[0] = keccak256(canonical signature) — cast handles this
+#   topics[0] = keccak256(canonical signature). cast handles this
 #   topics[1] = roundId, 32-byte left-padded uint64
 #   data      = 8 fields ABI-encoded:
 #               winningBlock(uint8, right-padded in 32 bytes),
@@ -259,7 +259,7 @@ for log in raw_logs:
 
     # top_miner_pseudonym handling. This is the pseudonym of the topMiner
     # field from RoundSettled (the recipient of the round's topMinerReward),
-    # NOT a "beanpot winner" — the beanpot itself is always distributed
+    # NOT a "beanpot winner". The beanpot itself is always distributed
     # proportionally across all winners on the winning block.
     #   - is_split == true: contract emits topMiner == 0x0 because no single
     #     recipient exists for the topMinerReward (it's split proportionally
