@@ -1,14 +1,15 @@
 # minebean-indexer
 
-Bash indexer that reads on-chain state and events from the MineBean `GridMining` contract on Base and publishes signed audit logs to MineBean's Gitlawb repos. Five flows ship today:
+Bash indexer that reads on-chain state and events from the MineBean `GridMining` contract on Base and publishes signed audit logs to MineBean's Gitlawb repos. Six flows ship today:
 
 - **commit-window** → [`minebean-rounds`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-rounds): one window file every 5 minutes covering the last 5 settled rounds.
 - **commit-nostradamus** → [`minebean-nostradamus`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-nostradamus): one decision file per settled round, replaying the canonical closed-form EV math from `hermes-mine-bean/strategies.py` (`_nostradamus`).
 - **commit-claims** → [`minebean-claims`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-claims): one claim file per `ClaimedBEAN` event emitted by GridMining, with pseudonymized claimer and the full mined/roasted/fee/net breakdown.
 - **commit-beanpots** → [`minebean-beanpots`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-beanpots): one hit file per `RoundSettled` event where `beanpotAmount > 0`, covering both single-winner and split-pot scenarios.
 - **commit-vaults** → [`minebean-vaults`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-vaults): one snapshot per cron tick (hourly) of ETH + BEAN balances for the three MineBean strategy vaults (auto_miner, anti_loser_vault, nostradamus_vault).
+- **commit-stake** → [`minebean-stake`](https://gitlawb.com/z6MkwVfgaAnuypajisEkJLkVbWPiPEBwceMkGutfXpEEYHKi/minebean-stake): one snapshot per cron tick (hourly) of BEAN staked vs total supply, with the staked-supply fraction.
 
-All five flows are independent: separate workflows, separate concurrency groups, separate Gitlawb repos.
+All six flows are independent: separate workflows, separate concurrency groups, separate Gitlawb repos.
 
 ## How it works
 
@@ -48,6 +49,7 @@ Set under repo Settings → Secrets and variables → Actions:
 | `GITLAWB_CLAIMS_REPO` | Gitlawb push URL for the claims repo (e.g. `gitlawb://…/minebean-claims`). Used by `commit-claims`. |
 | `GITLAWB_BEANPOTS_REPO` | Gitlawb push URL for the beanpots repo (e.g. `gitlawb://…/minebean-beanpots`). Used by `commit-beanpots`. |
 | `GITLAWB_VAULTS_REPO` | Gitlawb push URL for the vaults repo (e.g. `gitlawb://…/minebean-vaults`). Used by `commit-vaults`. |
+| `GITLAWB_STAKE_REPO` | Gitlawb push URL for the stake repo (e.g. `gitlawb://…/minebean-stake`). Used by `commit-stake`. |
 | `BASE_RPC_URL` | Base mainnet RPC endpoint. Public works (`https://mainnet.base.org`). |
 
 ## Manual trigger
@@ -58,9 +60,10 @@ gh workflow run commit-nostradamus.yml  --repo damo-nu11/minebean-indexer
 gh workflow run commit-claims.yml       --repo damo-nu11/minebean-indexer
 gh workflow run commit-beanpots.yml     --repo damo-nu11/minebean-indexer
 gh workflow run commit-vaults.yml       --repo damo-nu11/minebean-indexer
+gh workflow run commit-stake.yml        --repo damo-nu11/minebean-indexer
 ```
 
-Or via cron-job.org POSTing to (one entry per workflow). Window, nostradamus, claims, and beanpots run on a 5-minute schedule; vaults runs hourly:
+Or via cron-job.org POSTing to (one entry per workflow). Window, nostradamus, claims, and beanpots run on a 5-minute schedule; vaults and stake run hourly:
 
 ```
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-window.yml/dispatches
@@ -68,6 +71,7 @@ https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-claims.yml/dispatches
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-beanpots.yml/dispatches
 https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-vaults.yml/dispatches
+https://api.github.com/repos/damo-nu11/minebean-indexer/actions/workflows/commit-stake.yml/dispatches
 ```
 
 ## Local testing

@@ -1,0 +1,55 @@
+name: commit-stake
+
+on:
+  workflow_dispatch:
+  # No schedule. External cron (cron-job.org) hits workflow_dispatch hourly.
+
+concurrency:
+  group: commit-stake
+  cancel-in-progress: false
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout indexer repo
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Install Gitlawb CLI
+        run: |
+          curl -fsSL https://gitlawb.com/install.sh | bash
+          echo "/usr/local/bin" >> "$GITHUB_PATH"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Restore Gitlawb identity files
+        env:
+          GITLAWB_IDENTITY_PEM_B64: ${{ secrets.GITLAWB_IDENTITY_PEM_B64 }}
+          GITLAWB_UCAN_JSON_B64: ${{ secrets.GITLAWB_UCAN_JSON_B64 }}
+        run: |
+          mkdir -p "$HOME/.gitlawb"
+          printf '%s' "$GITLAWB_IDENTITY_PEM_B64" | base64 -d > "$HOME/.gitlawb/identity.pem"
+          printf '%s' "$GITLAWB_UCAN_JSON_B64" | base64 -d > "$HOME/.gitlawb/ucan.json"
+          chmod 600 "$HOME/.gitlawb/identity.pem"
+
+      - name: Verify Gitlawb identity
+        run: |
+          which gl || { echo "ERROR: gl binary not on PATH after install"; exit 1; }
+          gl --version
+          gl identity show
+
+      - name: Run stake indexer
+        env:
+          BASE_RPC_URL: ${{ secrets.BASE_RPC_URL }}
+          GITLAWB_STAKE_REPO: ${{ secrets.GITLAWB_STAKE_REPO }}
+          GITLAWB_DID: ${{ secrets.GITLAWB_DID }}
+          GITLAWB_NODE: https://node.gitlawb.com
+        run: |
+          chmod +x scripts/*.sh
+          OUTPUT_PATH=/tmp/stake-snapshot.json bash scripts/fetch-stake.sh
+          STAKE_JSON_PATH=/tmp/stake-snapshot.json bash scripts/commit-stake.sh
